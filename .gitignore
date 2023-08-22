@@ -1,0 +1,10 @@
+.vscode
+_site
+.DS_Store
+.sw[a-z]
+.idea/ 
+*.iml
+*.json
+venv/
+archive/
+test/
