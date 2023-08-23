@@ -11,63 +11,49 @@ import os
 import requests
 
 """
-# See https://docs.splunk.com/Documentation/Splunk/9.1.0/Data/HECExamples
+See 
+    https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector
+    https://docs.splunk.com/Documentation/Splunk/latest/Data/HECExamples
 """
 
-# Use OCI Application or Function configurations to override these environment variable defaults.
+# The Payload map is an optional feature that lets you precisely control mapping of OCI event
+# attributes to the Splunk fields.  The Payload map is simple JSON where non-object r-values are
+# used as the OCI event keys to extract.
+#
+# Note that the r-values can be at any nested level within the OCI event payload.
+# This approach works for OCI logging events as well as OCI raw metrics events.
 
-api_endpoint = os.getenv('SPLUNK_HEC_ENDPOINT', 'not-configured')
-api_key = os.getenv('SPLUNK_HEC_TOKEN', 'not-configured')
-is_forwarding = eval(os.getenv('FORWARDING_ENABLED', "True"))
-batch_size = int(os.getenv('BATCH_SIZE', '1000'))
 
-# NOTE: API Contact --
-# "event" key is required
-# "sourcetype" is optional
-
-payload_map_default_works = {
-    "event": "event",
-    "sourcetype": "sourcetype"
-}
-
-payload_map_default = {
-    "event": "name",
+payload_map_default = """
+{
     "fields": {
-        "time": "timestamp",
-        "source": "name",
+        "name": "name",
+        "namespace": "namespace",
+        "timestamp": "timestamp",
         "value": "value",
+        "count": "count",
+        "type": "type",
+        "source": "source",
+        "displayName": "displayName",
         "compartmentid": "compartmentid",
         "ingestedtime": "ingestedtime",
-        "loggroupid": "loggroupid",
-        "logid": "logid",
+        "sourceAddress": "sourceAddress",
+        "destinationAddress": "destinationAddress",
         "tenantid": "tenantid"
     }
 }
+"""
 
-payload_map_default_hold = {
-    "time": "timestamp",
-    "event": "name",
-    "value": "value",
-    "type": "type",
-    "fields": {
-        "region": None,
-        "datacenter": None,
-        "rack": None,
-        "sourceAddress": 'sourceAddress',
-        "displayName": "displayName",
-        "namespace": 'namespace',
-        "datetime": 'datetime',
-        "resourceId": "resourceId",
-        "service_version": None,
-        "service_environment": None,
-        "path": None,
-        "fstype": None,
-        "compartmentId": "compartmentId",
-        "compartmentid": "compartmentid"
-    }
-}
+# Use OCI Application or Function configurations to override these environment variable defaults.
+# SPLUNK_HEC_ENDPOINT trial account example:  https://<your-subdomain>.splunkcloud.com:8088/services/collector
 
-payload_map = os.getenv('PAYLOAD_MAP', payload_map_default)
+api_endpoint = os.getenv('SPLUNK_HEC_ENDPOINT', 'not-configured')
+api_key = os.getenv('SPLUNK_HEC_TOKEN', 'not-configured')
+send_to_splunk = eval(os.getenv('SEND_TO_SPLUNK', "True"))
+verify_ssl = eval(os.getenv('VERIFY_SSL', "True"))
+batch_size = int(os.getenv('BATCH_SIZE', '100'))
+payload_map = json.loads(os.getenv('PAYLOAD_MAP', payload_map_default))
+bypass_payload_map = eval(os.getenv('BYPASS_PAYLOAD_MAP', "True"))
 
 # Set all registered loggers to the configured log_level
 
@@ -91,7 +77,7 @@ def handler(ctx, data: io.BytesIO = None):
 
     try:
         event_list = json.loads(data.getvalue())
-        logging.getLogger().info(preamble.format(ctx.FnName(), len(event_list), logging_level, is_forwarding))
+        logging.getLogger().info(preamble.format(ctx.FnName(), len(event_list), logging_level, send_to_splunk))
         logging.getLogger().debug(event_list)
         converted_event_list = handle_events(event_list=event_list)
         send_to_endpoint(event_list=converted_event_list)
@@ -120,17 +106,27 @@ def handle_events(event_list):
 
 
 def transform_log(record: dict):
+    """
+    :param record: OCI Log event
+    :return: record list transformed to Splunk format
+    """
     return [get_transformer()(record=record)]
 
 
 def transform_metric(record: dict) -> list:
+    """
+    In the case of OCI raw metrics, there can be several datapoints in one event.  To handle this,
+    datapoints are re-characterized to map each one as individual Splunk events.
+    :param record: OCI Raw Metric event
+    :return: record list transformed to Splunk format
+    """
 
     results = []
     datapoints = record.get('datapoints')
     del record['datapoints']
 
     for point in datapoints:
-        point["inversion"] = record
+        point["details"] = record
         result = get_transformer()(record=point)
         results.append(result)
 
@@ -138,7 +134,11 @@ def transform_metric(record: dict) -> list:
 
 
 def get_transformer():
-    if payload_map is None:
+    """
+    :return: the module function that performs the transformation depending on whether mapping is bypassed.
+    """
+
+    if bypass_payload_map is True:
         return transform_bypass
     else:
         return transform_using_map
@@ -146,6 +146,9 @@ def get_transformer():
 
 def transform_using_map(record: dict, lookup_map=payload_map):
     """
+    :param record: OCI Log or Raw Metric
+    :param lookup_map: map to use for transformation
+    :return: record transformed to Splunk format
     """
 
     result = {}
@@ -167,6 +170,7 @@ def transform_using_map(record: dict, lookup_map=payload_map):
 def transform_bypass(record: dict):
     """
     See https://docs.splunk.com/Documentation/Splunk/9.1.0/Data/HECExamples
+    :return: record transformed to Splunk format
     """
 
     result = {
@@ -179,10 +183,12 @@ def transform_bypass(record: dict):
 
 def send_to_endpoint(event_list):
     """
+    :param event_list: list of transformed event records to send
+    :return: None
     """
 
-    if is_forwarding is False:
-        logging.getLogger().debug("forwarding is disabled - nothing sent")
+    if send_to_splunk is False:
+        logging.getLogger().debug("forwarding to Splunk is disabled - nothing sent")
         return
 
     # creating a session and adapter to avoid recreating
@@ -197,32 +203,24 @@ def send_to_endpoint(event_list):
 
         # subdivide incoming payload into separate lists that are within the configured batch size
 
-        batch_mode = True
+        batches = []
+        sub_list = []
+        batches.append(sub_list)
 
-        if batch_mode:
-            batches = []
-            sub_list = []
-            batches.append(sub_list)
+        for event in event_list:
+            sub_list.append(event)
+            if len(sub_list) > batch_size:
+                sub_list = []
+                batches.append(sub_list)
 
-            for event in event_list:
-                sub_list.append(event)
-                if len(sub_list) > batch_size:
-                    sub_list = []
-                    batches.append(sub_list)
+        for batch_list in batches:
+            post_response = session.post(api_endpoint,
+                                         data=json.dumps(batch_list),
+                                         headers=http_headers,
+                                         verify=verify_ssl)
 
-            for batch_list in batches:
-                post_response = session.post(api_endpoint, data=json.dumps(batch_list), headers=http_headers, verify=False)
-
-                if post_response.status_code != 200:
-                    raise Exception('error posting to API endpoint', post_response.text)
-
-        else:
-
-            for event in event_list:
-                post_response = session.post(api_endpoint, data=json.dumps(event), headers=http_headers, verify=False)
-
-                if post_response.status_code != 200:
-                    raise Exception('error posting to API endpoint', post_response.text)
+            if post_response.status_code != 200:
+                raise Exception('error posting to API endpoint', post_response.text)
 
     finally:
         session.close()
@@ -259,8 +257,8 @@ def get_dictionary_value(dictionary: dict, target_key: str):
 
 def local_test_mode_linefeed_file(filename):
     """
-    This routine reads a local json metrics file, converting the contents to DataDog format.
-    :param filename: cloud events json file exported from OCI Logging UI or CLI.
+    This routine reads a local file with CR/LF separated event records, transforms and sends to Splunk if so enabled.
+    :param filename: cloud events file exported from OCI UI or CLI.
     :return: None
     """
 
@@ -281,6 +279,11 @@ def local_test_mode_linefeed_file(filename):
 
 
 def local_test_mode_json_file(filename):
+    """
+    This routine reads a local JSON file of event records, transforms and sends to Splunk if so enabled.
+    :param filename: cloud events JSON file exported from OCI UI or CLI.
+    :return: None
+    """
 
     with open(filename, 'r') as f:
         inbound_events = json.load(f)
@@ -292,10 +295,10 @@ def local_test_mode_json_file(filename):
 
 
 """
-Local Debugging 
+Local Testing 
 """
 
 if __name__ == "__main__":
-    # local_test_mode_linefeed_file('oci-metrics-test-file.json')
+    local_test_mode_linefeed_file('oci-metrics-test-file.json')
     local_test_mode_json_file('oci_logs.json')
-    # local_test_mode_linefeed_file('simple-event.json') WORKS
+
