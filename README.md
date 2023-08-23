@@ -300,20 +300,23 @@ Set `LOGGING_LEVEL = DEBUG` as a general rule while first deploying the Function
 
 This [troubleshooting guide](https://docs.public.oneportal.content.oci.oraclecloud.com/en-us/iaas/Content/Functions/Tasks/functionstroubleshooting.htm) can also be very helpful.
 
+### Function Timing-Out
+
+* Increase `BATCH_SIZE` above
+* [Increase Function timeout and/or memory allocation](https://docs.oracle.com/en-us/iaas/Content/Functions/Tasks/functionscustomizing.htm)
 
 ---
 ## View Metrics In Splunk
 
-When you have the Service Connector configured, metrics appear in Splunk's Metrics Explorer and notebooks 
-after a few minutes. The following images show the Metrics Explorer and Notebook user interfaces in 
-Splunk. Your VCN metrics are displayed.
+When you have the Service Connector configured, metrics should appear in Splunk
+after a few minutes.
 
 ---
 ## Conclusion
 
 You now have a low-maintenance, serverless function that can send raw metrics over to Splunk in
-near-real time. I encourage you to experiment with the dimensions and metadata tag mappings 
-to see which combination works best for your use case.  
+near-real time. I encourage you to experiment with the payload mappings to get the most value out 
+of this integration.
 
 For more information, see the following resources:
 
