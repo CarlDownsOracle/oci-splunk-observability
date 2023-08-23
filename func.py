@@ -11,9 +11,9 @@ import os
 import requests
 
 """
-See 
-    https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector
-    https://docs.splunk.com/Documentation/Splunk/latest/Data/HECExamples
+Splunk Resources:
+https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector
+https://docs.splunk.com/Documentation/Splunk/latest/Data/HECExamples
 """
 
 # The Payload map is an optional feature that lets you precisely control mapping of OCI event
@@ -47,13 +47,14 @@ payload_map_default = """
 # Use OCI Application or Function configurations to override these environment variable defaults.
 # SPLUNK_HEC_ENDPOINT trial account example:  https://<your-subdomain>.splunkcloud.com:8088/services/collector
 
+preamble = " {} / event count = {} / logging level = {} / send to splunk = {} / use payload map = {}"
 api_endpoint = os.getenv('SPLUNK_HEC_ENDPOINT', 'not-configured')
 api_key = os.getenv('SPLUNK_HEC_TOKEN', 'not-configured')
 send_to_splunk = eval(os.getenv('SEND_TO_SPLUNK', "True"))
 verify_ssl = eval(os.getenv('VERIFY_SSL', "True"))
 batch_size = int(os.getenv('BATCH_SIZE', '100'))
-payload_map = json.loads(os.getenv('PAYLOAD_MAP', payload_map_default))
-bypass_payload_map = eval(os.getenv('BYPASS_PAYLOAD_MAP', "True"))
+payload_map = json.loads(os.getenv('CUSTOM_PAYLOAD_MAP', payload_map_default))
+use_payload_map = eval(os.getenv('USE_PAYLOAD_MAP', "False"))
 
 # Set all registered loggers to the configured log_level
 
@@ -73,11 +74,14 @@ def handler(ctx, data: io.BytesIO = None):
     :return: plain text response indicating success or error
     """
 
-    preamble = " {} / event count = {} / logging level = {} / forwarding to endpoint = {}"
-
     try:
         event_list = json.loads(data.getvalue())
-        logging.getLogger().info(preamble.format(ctx.FnName(), len(event_list), logging_level, send_to_splunk))
+        logging.getLogger().info(preamble.format(ctx.FnName(),
+                                                 len(event_list),
+                                                 logging_level,
+                                                 send_to_splunk,
+                                                 use_payload_map))
+
         logging.getLogger().debug(event_list)
         converted_event_list = handle_events(event_list=event_list)
         send_to_endpoint(event_list=converted_event_list)
@@ -138,10 +142,10 @@ def get_transformer():
     :return: the module function that performs the transformation depending on whether mapping is bypassed.
     """
 
-    if bypass_payload_map is True:
-        return transform_bypass
-    else:
+    if use_payload_map is True:
         return transform_using_map
+    else:
+        return transform_bypass
 
 
 def transform_using_map(record: dict, lookup_map=payload_map):
@@ -262,8 +266,6 @@ def local_test_mode_linefeed_file(filename):
     :return: None
     """
 
-    logging.getLogger().info("local testing started")
-
     inbound_events = list()
     with open(filename, 'r') as f:
         for line in f:
@@ -274,8 +276,6 @@ def local_test_mode_linefeed_file(filename):
     transformed_results = handle_events(event_list=inbound_events)
     print(json.dumps(transformed_results, indent=4))
     send_to_endpoint(event_list=transformed_results)
-
-    logging.getLogger().info("local testing completed")
 
 
 def local_test_mode_json_file(filename):
@@ -291,7 +291,6 @@ def local_test_mode_json_file(filename):
     transformed_results = handle_events(event_list=inbound_events)
     print(json.dumps(transformed_results, indent=4))
     send_to_endpoint(event_list=transformed_results)
-    logging.getLogger().info("local testing completed")
 
 
 """
