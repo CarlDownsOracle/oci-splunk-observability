@@ -138,7 +138,7 @@ To get a sense of the options.
 
 ### Default Mapping Behavior
 
-By default, the Function will transform OCI events as needed to instruct the Splunk platform to extract JSON 
+By default (`USE_PAYLOAD_MAP` = `False`), the Function will transform OCI events as needed to instruct the Splunk platform to extract JSON 
 fields from the events you send to HEC.  See [Example 8](https://docs.splunk.com/Documentation/Splunk/9.1.0/Data/HECExamples#Example_9:_Explicit_JSON_fields).
 
     {
