@@ -1,4 +1,4 @@
-# Exporting OCI Logging and Metrics to Splunk
+# Exporting OCI Logs and Metrics to Splunk
 
 ---
 
@@ -17,11 +17,11 @@ the [Quick Start guide on OCI Functions](http://docs.oracle.com/en-us/iaas/Conte
 
 ![](images/architecture.png)
 
-Here is the basic architecture and flow of data from beginning to end:
+Here is the basic architecture:
 
 * OCI Services emit metric and logging data which is captured by the Monitoring and Logging services respectively.
 * Both Monitoring and Logging services can feed their data to a Service Connector for downstream processing.
-* The Service Connector can pass those events to a Function.
+* The Service Connector can pass those data feeds to a Function.
 * Functions can transform the events into Splunk format and post to Splunk HTTP Event Collector REST API.
 
 Let's drill down into the OCI Services involved.
