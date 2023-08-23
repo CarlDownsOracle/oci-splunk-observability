@@ -22,7 +22,7 @@ Here is the basic architecture:
 * OCI Services emit metric and logging data which is captured by the Monitoring and Logging services respectively.
 * Both Monitoring and Logging services can feed their data to a Service Connector for downstream processing.
 * The Service Connector can pass those data feeds to a Function.
-* Functions can transform the events into Splunk format and post to Splunk HTTP Event Collector REST API.
+* Functions can transform the events into Splunk format and post to [Splunk HTTP Event Collector REST API](https://docs.splunk.com/Documentation/Splunk/9.1.0/Data/UsetheHTTPEventCollector).
 
 Let's drill down into the OCI Services involved.
 
@@ -160,10 +160,10 @@ You can customize the Fine-Grained mapper by simply create a JSON modeled on the
 install it as a Function Application configuration parameter.
 
 To enable this feature:
-* set `USE_PAYLOAD_MAP` = `True`. 
+* set `USE_PAYLOAD_MAP` = `True` 
 
 To customize it:
-* set `CUSTOM_PAYLOAD_MAP` = custom payload map (JSON) you want to use.
+* set `CUSTOM_PAYLOAD_MAP` = `custom payload map (JSON) you want to use.`
 
 Here is the default the Fine-Grained mapper JSON:
 
