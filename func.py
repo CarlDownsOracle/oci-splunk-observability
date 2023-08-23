@@ -18,14 +18,35 @@ import requests
 
 api_endpoint = os.getenv('SPLUNK_HEC_ENDPOINT', 'not-configured')
 api_key = os.getenv('SPLUNK_HEC_TOKEN', 'not-configured')
-is_forwarding = eval(os.getenv('FORWARDING_ENABLED', "False"))  # FIXME
+is_forwarding = eval(os.getenv('FORWARDING_ENABLED', "True"))
 batch_size = int(os.getenv('BATCH_SIZE', '1000'))
 
+# NOTE: API Contact --
+# "event" key is required
+# "sourcetype" is optional
+
+payload_map_default_works = {
+    "event": "event",
+    "sourcetype": "sourcetype"
+}
+
 payload_map_default = {
+    "event": "name",
+    "fields": {
+        "time": "timestamp",
+        "source": "name",
+        "value": "value",
+        "compartmentid": "compartmentid",
+        "ingestedtime": "ingestedtime",
+        "loggroupid": "loggroupid",
+        "logid": "logid",
+        "tenantid": "tenantid"
+    }
+}
+
+payload_map_default_hold = {
     "time": "timestamp",
-    "event": "namespace",
-    "source": "name",
-    "sourcetype": "displayName",
+    "event": "name",
     "value": "value",
     "type": "type",
     "fields": {
@@ -33,7 +54,8 @@ payload_map_default = {
         "datacenter": None,
         "rack": None,
         "sourceAddress": 'sourceAddress',
-        "arch": None,
+        "displayName": "displayName",
+        "namespace": 'namespace',
         "datetime": 'datetime',
         "resourceId": "resourceId",
         "service_version": None,
@@ -42,7 +64,7 @@ payload_map_default = {
         "fstype": None,
         "compartmentId": "compartmentId",
         "compartmentid": "compartmentid"
-}
+    }
 }
 
 payload_map = os.getenv('PAYLOAD_MAP', payload_map_default)
@@ -175,21 +197,32 @@ def send_to_endpoint(event_list):
 
         # subdivide incoming payload into separate lists that are within the configured batch size
 
-        batches = []
-        sub_list = []
-        batches.append(sub_list)
+        batch_mode = True
 
-        for event in event_list:
-            sub_list.append(event)
-            if len(sub_list) > batch_size:
-                sub_list = []
-                batches.append(sub_list)
+        if batch_mode:
+            batches = []
+            sub_list = []
+            batches.append(sub_list)
 
-        for batch_list in batches:
-            post_response = session.post(api_endpoint, data=json.dumps(batch_list), headers=http_headers)
+            for event in event_list:
+                sub_list.append(event)
+                if len(sub_list) > batch_size:
+                    sub_list = []
+                    batches.append(sub_list)
 
-            if post_response.status_code != 200:
-                raise Exception('error posting to API endpoint', post_response.text)
+            for batch_list in batches:
+                post_response = session.post(api_endpoint, data=json.dumps(batch_list), headers=http_headers, verify=False)
+
+                if post_response.status_code != 200:
+                    raise Exception('error posting to API endpoint', post_response.text)
+
+        else:
+
+            for event in event_list:
+                post_response = session.post(api_endpoint, data=json.dumps(event), headers=http_headers, verify=False)
+
+                if post_response.status_code != 200:
+                    raise Exception('error posting to API endpoint', post_response.text)
 
     finally:
         session.close()
@@ -224,7 +257,7 @@ def get_dictionary_value(dictionary: dict, target_key: str):
                         return target_value
 
 
-def local_test_mode(filename):
+def local_test_mode_linefeed_file(filename):
     """
     This routine reads a local json metrics file, converting the contents to DataDog format.
     :param filename: cloud events json file exported from OCI Logging UI or CLI.
@@ -247,7 +280,7 @@ def local_test_mode(filename):
     logging.getLogger().info("local testing completed")
 
 
-def local_test_mode2(filename):
+def local_test_mode_json_file(filename):
 
     with open(filename, 'r') as f:
         inbound_events = json.load(f)
@@ -263,5 +296,6 @@ Local Debugging
 """
 
 if __name__ == "__main__":
-    local_test_mode('oci-metrics-test-file.json')
-    local_test_mode2('oci_logs.json')
+    # local_test_mode_linefeed_file('oci-metrics-test-file.json')
+    local_test_mode_json_file('oci_logs.json')
+    # local_test_mode_linefeed_file('simple-event.json') WORKS
