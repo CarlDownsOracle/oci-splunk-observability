@@ -308,24 +308,26 @@ _Let's assume you create a user group with name `functions-developers`._
 
 See [common policies](https://docs.oracle.com/en-us/iaas/Content/Identity/Concepts/commonpolicies.htm).
 
-Let's assume we will permit users in 'functions-developers' to create, deploy and manage Functions and Applications.
+Here is an example IAM policy structure:
+
+Allow users in `functions-developers` to create, deploy and manage Functions and Applications at the tenancy level.
 
     Allow group functions-developers to manage repos in tenancy
     Allow group functions-developers to manage serviceconnectors in tenancy
     Allow group functions-developers to manage metrics in tenancy
-    Allow group functions-developers to manage logging in tenancy
+    Allow group functions-developers to manage logging-family in tenancy
     Allow group functions-developers to use cloud-shell in tenancy
     Allow group functions-developers to use virtual-network-family in tenancy
 
-We need to allow Functions Service to use OCIR Repositories:
+Allow Functions Service to use OCIR Repositories at the tenancy level:
 
     Allow service faas to use repos in tenancy 
 
-We need to allow Service Connector to use Functions and Metrics and Logs:
+Allow Service Connector to use Functions, Metrics and Logs at the compartment level:
 
     Allow service service-connector-hub to use functions-family in compartment ABC
     Allow service service-connector-hub to use metrics in compartment ABC
-    Allow service service-connector-hub to use logging in compartment ABC
+    Allow service service-connector-hub to use logging-family in compartment ABC
 
 
 ---
@@ -345,8 +347,8 @@ Once you have your Function Application build, configure the Function by setting
 | VERIFY_SSL |      True      | This should be enabled in production                                                                                                                                      |
 | LOGGING_LEVEL |      INFO      | Controls function logging outputs.  Choices: INFO, WARN, CRITICAL, ERROR, DEBUG                                                                                           |
 | BATCH_SIZE |      100       | Number of records posted to Splunk per call                                                                                                                               |
-| USE_PAYLOAD_MAP |     False      | If False, send entire record to Splunk                                                                                                                                    |
-| CUSTOM_PAYLOAD_MAP |            | Stringified JSON that is your custom mapper.                                                                                                                              |
+| USE_PAYLOAD_MAP |     False      | If `False`, send entire record to Splunk as `_json`.  If `True`, use the Payload Map.                                                                                         |
+| CUSTOM_PAYLOAD_MAP |            | Stringified JSON that is your custom JSON payload map                                                                                                                     |
 
 
 ---
