@@ -4,8 +4,8 @@
 
 ## Overview
 
-This code sample demonstrates how to export Oracle Cloud Infrastructure (OCI)’s Observability data over to 
-[Splunk](https://splunk.com).
+This code sample demonstrates how to natively export Oracle Cloud Infrastructure (OCI) Observability data over to 
+[Splunk](https://splunk.com) via an HTTP Event Collector.
 
 ### Prerequisites
 
