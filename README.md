@@ -192,7 +192,8 @@ Here is an example of a transformed metric event using this logic:
 
 ## Payload Maps
 
-There also is an **optional** feature called a **Payload Map**.  Use it if you need to pass a subset of `key=value` pairs to Splunk.
+There also is an **optional** feature called a **Payload Map**.  Use it if you need greater control over the
+transformation.
 
 In this mode, the Function uses a JSON map where the `l-values` are the keys that Splunk expects to see and the `r-values` in the map _are used 
 as **keys** to look up **values** in the OCI event payload_. If the Function finds a match _anywhere_ in the 
