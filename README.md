@@ -9,6 +9,8 @@ This code sample demonstrates how to natively export Oracle Cloud Infrastructure
 
 ### Prerequisites
 
+See [Splunk HTTP Event Collector REST API](https://docs.splunk.com/Documentation/Splunk/9.1.0/Data/UsetheHTTPEventCollector) to get a sense of how Splunk HEC works.
+
 If you’re new to Functions, get familiar by running through 
 the [Quick Start guide on OCI Functions](http://docs.oracle.com/en-us/iaas/Content/Functions/Tasks/functionsquickstartguidestop.htm) before proceeding.
 
@@ -22,8 +24,6 @@ Here is the basic flow-of-control:
 * All OCI Services emit audit, metric and logging events which are ingested by the Monitoring and Logging services respectively.
 * The Service Connector receives these events, invoking a Function to handle them as they arrive.
 * The Function transforms the events into Splunk format and post to Splunk.
-
-See [Splunk HTTP Event Collector REST API](https://docs.splunk.com/Documentation/Splunk/9.1.0/Data/UsetheHTTPEventCollector) to get a sense of how Splunk HEC works.
 
 Let's drill down into the OCI Services involved.
 
