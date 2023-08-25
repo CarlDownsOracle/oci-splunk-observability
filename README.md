@@ -27,46 +27,58 @@ Here is the basic architecture:
 Let's drill down into the OCI Services involved.
 
 ---
+## Logging Service
+
+The [Logging Service](https://docs.oracle.com/en-us/iaas/Content/Logging/Concepts/loggingoverview.htm)
+is a highly scalable and fully managed single pane of glass for all the logs in your tenancy. Logging provides 
+access to log data from Oracle Cloud Infrastructure resources. These logs include critical 
+diagnostic information that describes how resources are performing and being accessed.
+
+
+---
 ## Monitoring Service
 
- The [Monitoring Service](https://docs.oracle.com/en-us/iaas/Content/Monitoring/Concepts/monitoringoverview.htm)
- receives timestamp-value pairs (aka metric data points) which also carry contextual 
+The [Monitoring Service](https://docs.oracle.com/en-us/iaas/Content/Monitoring/Concepts/monitoringoverview.htm)
+receives timestamp-value pairs (aka metric data points) which also carry contextual 
 dimensions and metadata about the services or applications that emitted them. 
 
 
 ---
-## Logging Service
+## Auditing Service
 
- The [Logging Service](https://docs.oracle.com/en-us/iaas/Content/Logging/Concepts/loggingoverview.htm)
-is a highly scalable and fully managed single pane of glass for all the logs in your tenancy. Logging provides 
- access to logs from Oracle Cloud Infrastructure resources. These logs include critical 
- diagnostic information that describes how resources are performing and being accessed.
+The [Auditing Service](https://docs.oracle.com/en-us/iaas/Content/Audit/home.htm)
+provides visibility into activities related to your OCI resources and tenancy. 
+Audit log events can be used for security audits, to track usage of and changes to Oracle Cloud 
+Infrastructure resources, and to help ensure compliance with standards or regulations.
 
 ---
 ## Service Connector Hub
 
-The stream of Metric data is event-driven and must be handled on-demand and at scale. The 
+The streams of Log and / or Metric data is event-driven and must be handled on-demand and at scale. The 
 [Service Connector Hub](https://docs.oracle.com/en-us/iaas/Content/service-connector-hub/overview.htm) does
 exactly that.  See [Service Connector Hub documentation](https://docs.oracle.com/en-us/iaas/Content/service-connector-hub/overview.htm) for details.
 
 ---
 ## Functions Service
 
-I need to transform between the raw metrics formats and some way to make the Splunk API calls. The 
+#### We need to deploy some logic that:
+* transforms log and raw metric events into a format that Splunk can accept
+* sends transformed events in batch to the Splunk event collection endpoint
+
+The 
 [OCI Functions Service](http://docs.oracle.com/en-us/iaas/Content/Functions/Concepts/functionsoverview.htm) is a 
-natural fit for the task. Functions integrate nicely with Service Connector Hub as as a target and can scale up
-depending on the demand.  That lets me focus on writing the logic needed without needing to address how to 
-deploy and scale it.
+natural fit for the task. Serverless Functions paired with Service Connectors can scale up seamlessly
+to handle demand.
 
 ---
-## Mapping From OCI to Splunk Formats
+## Transforming From OCI to Splunk Event Formats
 
-A key requirement of course is the mapping of OCI to Splunk format.  Let's compare the OCI and Splunk
-message payload formats, what the mapping needs to accomplish, and see what the resulting transformed message 
-looks like.
+A key requirement is the transformation of OCI to Splunk format.  Let's compare the OCI and Splunk
+message payload formats, what the mapping needs to accomplish, and see what the resulting transformed messages 
+look like.
 
 
-### Example OCI Metrics Payload:
+### Here is an example OCI Metrics event:
     
     {
         "namespace": "oci_vcn",
@@ -89,7 +101,7 @@ looks like.
         ]
     }
 
-### Example OCI Logging Payload:
+### Here is an example OCI Logging event:
 
     {
       "datetime": 1689108090000,
@@ -130,16 +142,15 @@ looks like.
     },
 
 
-### Splunk Supported Formats
+### Splunk Format Options
 
 There are several formats supported by Splunk,
 See [Format events for HTTP Event Collector](https://docs.splunk.com/Documentation/Splunk/latest/Data/FormateventsforHTTPEventCollector)
-To get a sense of the options.
+to get a sense of the options. By default, the Function will transform OCI events as needed 
+to instruct the Splunk platform to '**Extract JSON 
+Fields**' from the events.  See [Example 8](https://docs.splunk.com/Documentation/Splunk/9.1.0/Data/HECExamples#Example_9:_Explicit_JSON_fields) for details on this type of mapping.
 
-### Default Mapping Behavior
-
-By default (`USE_PAYLOAD_MAP` = `False`), the Function will transform OCI events as needed to instruct the Splunk platform to extract JSON 
-fields from the events you send to HEC.  See [Example 8](https://docs.splunk.com/Documentation/Splunk/9.1.0/Data/HECExamples#Example_9:_Explicit_JSON_fields).
+Here is what will be sent by default to Splunk:
 
     {
          "sourcetype": "_json", 
@@ -148,24 +159,15 @@ fields from the events you send to HEC.  See [Example 8](https://docs.splunk.com
          }
     }
 
-### [Optional] Fine-Grained Control over Mapping Behavior
+### Payload Maps
 
-You can alternatively configure the Function to map JSON more precisely to fit your needs.
-The Payload Map feature (if enabled) lets you select the keys ` or l-values` you want to pass to Splunk.
-The assigned values or `r-values` will come from the OCI event records.
-The mapper looks for a `"name" l-value` key in the OCI record.   If it finds this key anywhere in the record, 
-it will output the` l-value or value` corresponding to that key as the value for `"name"` in the resulting JSON.
+There also is an **optional** feature called a **Payload Map** if you want to pass a subset of  `key=value` pairs to Splunk.
+In this mode, the Function uses a map where the `keys` are the keys that Splunk expects to see and the `values` in the map _are used 
+as **keys** to look up the value in the OCI event payload_ to pass to Splunk. If the Function finds a match _anywhere_ in the 
+event (included nested within the JSON), the event payload `value` will be assigned to the Splunk-expected `key` and 
+included it in the transformed output.
 
-You can customize the Fine-Grained mapper by simply create a JSON modeled on the below default and 
-install it as a Function Application configuration parameter.
-
-To enable this feature:
-* set `USE_PAYLOAD_MAP` = `True` 
-
-To customize it:
-* set `CUSTOM_PAYLOAD_MAP` = `custom payload map (JSON) you want to use.`
-
-Here is the default the Fine-Grained mapper JSON:
+Here is the default the payload map:
 
      {
          "fields": {
@@ -185,7 +187,7 @@ Here is the default the Fine-Grained mapper JSON:
          }
      }
 
-Resulting Output of a Log Event using the Fine-Grained mapper:
+Here is the resulting output of a Log Event using the default payload map:
 
     {
         "fields": {
@@ -200,7 +202,7 @@ Resulting Output of a Log Event using the Fine-Grained mapper:
     }
 
 
-Resulting Output of a Metric Event using the Fine-Grained mapper:
+Here is the resulting output of a Raw Metric Event using the default payload map:
 
     {
         "fields": {
@@ -212,6 +214,26 @@ Resulting Output of a Metric Event using the Fine-Grained mapper:
             "displayName": "Mirrored Bytes from Network"
         }
     }
+
+### Customizing the Payload Map
+
+You can customize the selection by creating a JSON and setting it as a configuration parameter (see Function Configuration below).
+
+Note that the `keys` and `values` in the default payload map above are identical.  That causes the OCI key and value pair to be passed 
+to Splunk if present.  If you need to pass a different key for Splunk, just change the `l-value` like so:
+
+     {
+         "fields": {
+             "splunk_key_1": "name",
+             "splunk_key_2": "namespace",
+             "splunk_key_3": "timestamp",
+             "splunk_key_4": "value",
+             "splunk_key_5": "count"
+         }
+     }
+
+Finally, the `fields` object is not required.  Use 
+the [Splunk HEC examples](https://docs.splunk.com/Documentation/Splunk/latest/Data/HECExamples) as a guide.
 
 
 ---
@@ -321,8 +343,8 @@ of this integration.
 
 For more information, see the following resources:
 
-* https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector
-* https://docs.splunk.com/Documentation/Splunk/latest/Data/HECExamples
+* [Splunk HTTPEventCollector](https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector)
+* [HTTPEventCollector Examples](https://docs.splunk.com/Documentation/Splunk/latest/Data/HECExamples)
 
 ---
 ## **OCI** Related Workshops
