@@ -7,11 +7,10 @@
 This code sample demonstrates how to natively export Oracle Cloud Infrastructure (OCI) Observability data over to 
 [Splunk](https://splunk.com) via an HTTP Event Collector.
 
-### Prerequisites
+### Primers
 
 See [Splunk HTTP Event Collector REST API](https://docs.splunk.com/Documentation/Splunk/9.1.0/Data/UsetheHTTPEventCollector) to get a sense of how Splunk HEC works.
-
-If you’re new to Functions, get familiar by running through 
+If you’re new to OCI Functions, I'd recommend running through
 the [Quick Start guide on OCI Functions](http://docs.oracle.com/en-us/iaas/Content/Functions/Tasks/functionsquickstartguidestop.htm) before proceeding.
 
 ---
