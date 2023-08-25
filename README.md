@@ -4,8 +4,8 @@
 
 ## Overview
 
-Let's take a look at bringing Oracle Cloud Infrastructure (OCI)’s rich Metrics resources over to 
-[Splunk](https://splunk.com) to accomplish common goals such DevOps monitoring, application performance monitoring, and so on. 
+This code sample demonstrates how to export Oracle Cloud Infrastructure (OCI)’s Observability data over to 
+[Splunk](https://splunk.com).
 
 ### Prerequisites
 
