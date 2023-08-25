@@ -250,7 +250,7 @@ Here is the resulting output of a Raw Metric Event using the default payload JSO
 
 ## Customizing the Payload Map 
 
-You can customize the selection by creating your own JSON and setting it as a configuration parameter 
+To customize the behavior, create your own JSON and set it as a Function Configuration parameter 
 (see Function Configuration below).
 
 Note that the `l-values` and `r-values` in the default payload JSON above are identical.  That causes the OCI `key=value` 
