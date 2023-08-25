@@ -15,7 +15,7 @@ the [Quick Start guide on OCI Functions](http://docs.oracle.com/en-us/iaas/Conte
 ---
 ## Solution Architecture
 
-![](images/architecture.png)
+![](images/oci-splunk-observability.png)
 
 Here is the basic architecture:
 
