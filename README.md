@@ -250,8 +250,8 @@ Here is the resulting output of a Raw Metric Event using the default payload JSO
 
 ## Customizing the Payload Map 
 
-To customize the behavior, create your own JSON and set it as a Function Configuration parameter 
-(see Function Configuration below).
+The default map is really just a placeholder.  To customize the behavior, create your own JSON and pass it to 
+your Function by setting it as a configuration parameter (see Function Configuration below).
 
 Note that the `l-values` and `r-values` in the default payload JSON above are identical.  That causes the OCI `key=value` 
 pairs to be passed as-is.  If you need to pass a different key for Splunk, just change the `l-value` like so:
@@ -263,8 +263,23 @@ pairs to be passed as-is.  If you need to pass a different key for Splunk, just 
              "splunk_key_3": "timestamp",
              "splunk_key_4": "value",
              "splunk_key_5": "count"
+             "splunk_key_6": "displayName"
          }
      }
+
+Here is the resulting output of a Raw Metric Event using this JSON:
+
+    {
+        "fields": {
+            "splunk_key_1": "VnicFromNetworkMirrorBytes",
+            "splunk_key_2": "oci_vcn",
+            "splunk_key_3": 1652196492000,
+            "splunk_key_4": 0.0,
+            "splunk_key_5": 1,
+            "splunk_key_6": "Mirrored Bytes from Network"
+        }
+    }
+
 
 Refer to the [Splunk HEC examples](https://docs.splunk.com/Documentation/Splunk/latest/Data/HECExamples) page as a guide.
 
