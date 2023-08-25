@@ -24,7 +24,7 @@ Here is the basic flow-of-control:
 * The Service Connector receives these events, invoking a Function to handle them as they arrive.
 * The Function transforms the events into Splunk format and post to Splunk.
 
-Let's drill down into the OCI Services involved.
+Let's survey the OCI Services involved.
 
 ---
 ## Logging Service
