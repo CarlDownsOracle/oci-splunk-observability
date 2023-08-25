@@ -17,12 +17,13 @@ the [Quick Start guide on OCI Functions](http://docs.oracle.com/en-us/iaas/Conte
 
 ![](images/oci-splunk-observability.png)
 
-Here is the basic architecture:
+Here is the basic flow-of-control:
 
-* OCI Services emit metric and logging data which is captured by the Monitoring and Logging services respectively.
-* Both Monitoring and Logging services can feed their data to a Service Connector for downstream processing.
-* The Service Connector can pass those data feeds to a Function.
-* Functions can transform the events into Splunk format and post to [Splunk HTTP Event Collector REST API](https://docs.splunk.com/Documentation/Splunk/9.1.0/Data/UsetheHTTPEventCollector).
+* All OCI Services emit audit, metric and logging events which are ingested by the Monitoring and Logging services respectively.
+* The Service Connector receives these events, invoking a Function to handle them as they arrive.
+* The Function transforms the events into Splunk format and post to Splunk.
+
+See [Splunk HTTP Event Collector REST API](https://docs.splunk.com/Documentation/Splunk/9.1.0/Data/UsetheHTTPEventCollector) to get a sense of how Splunk HEC works.
 
 Let's drill down into the OCI Services involved.
 
@@ -54,31 +55,31 @@ Infrastructure resources, and to help ensure compliance with standards or regula
 ---
 ## Service Connector Hub
 
-The streams of Log and / or Metric data is event-driven and must be handled on-demand and at scale. The 
-[Service Connector Hub](https://docs.oracle.com/en-us/iaas/Content/service-connector-hub/overview.htm) does
-exactly that.  See [Service Connector Hub documentation](https://docs.oracle.com/en-us/iaas/Content/service-connector-hub/overview.htm) for details.
+The [Service Connector Hub](https://docs.oracle.com/en-us/iaas/Content/service-connector-hub/overview.htm) is designed 
+to handle Audit, Logging and Monitoring event streams on-demand and at scale.  See [Service Connector Hub documentation](https://docs.oracle.com/en-us/iaas/Content/service-connector-hub/overview.htm) for details.
 
 ---
 ## Functions Service
 
-#### We need to deploy some logic that:
-* transforms log and raw metric events into a format that Splunk can accept
-* sends transformed events in batch to the Splunk event collection endpoint
+We need to deploy a small amount of logic that transforms log and raw metric events into a 
+format that Splunk can accept and then sends the transformed events in batch to the 
+Splunk event collection endpoint.
 
-The 
-[OCI Functions Service](http://docs.oracle.com/en-us/iaas/Content/Functions/Concepts/functionsoverview.htm) is a 
-natural fit for the task. Serverless Functions paired with Service Connectors can scale up seamlessly
-to handle demand.
+[OCI Functions](http://docs.oracle.com/en-us/iaas/Content/Functions/Concepts/functionsoverview.htm) is a 
+natural fit for the task. OCI Functions is based on the [Fn Project](https://fnproject.io/), an open source, container 
+native, serverless platform that can be run anywhere - any cloud or on-premises. Fn Project 
+is easy to use, extensible, and performant.
+
 
 ---
-## Transforming From OCI to Splunk Event Formats
+## Transforming OCI Events to Splunk Format
 
-A key requirement is the transformation of OCI to Splunk format.  Let's compare the OCI and Splunk
-message payload formats, what the mapping needs to accomplish, and see what the resulting transformed messages 
+Let's compare the OCI and Splunk
+message payload formats, understand the mapping task, and see what the resulting transformed messages 
 look like.
 
 
-### Here is an example OCI Metrics event:
+Here is an example OCI Metrics event:
     
     {
         "namespace": "oci_vcn",
@@ -101,7 +102,7 @@ look like.
         ]
     }
 
-### Here is an example OCI Logging event:
+Here is an example OCI Logging event:
 
     {
       "datetime": 1689108090000,
@@ -142,15 +143,16 @@ look like.
     },
 
 
-### Splunk Format Options
+## Splunk Formats
+
+By default, the Function will transform OCI events as needed 
+to instruct the Splunk platform to` Extract JSON Fields` from the events as described [here](https://docs.splunk.com/Documentation/Splunk/9.1.0/Data/HECExamples#Example_9:_Explicit_JSON_fields). 
 
 There are several formats supported by Splunk,
 See [Format events for HTTP Event Collector](https://docs.splunk.com/Documentation/Splunk/latest/Data/FormateventsforHTTPEventCollector)
-to get a sense of the options. By default, the Function will transform OCI events as needed 
-to instruct the Splunk platform to '**Extract JSON 
-Fields**' from the events.  See [Example 8](https://docs.splunk.com/Documentation/Splunk/9.1.0/Data/HECExamples#Example_9:_Explicit_JSON_fields) for details on this type of mapping.
+to get a sense of all the options. 
 
-Here is what will be sent by default to Splunk:
+Here is the `Extract JSON Fields` logic:
 
     {
          "sourcetype": "_json", 
@@ -159,15 +161,45 @@ Here is what will be sent by default to Splunk:
          }
     }
 
-### Payload Maps
 
-There also is an **optional** feature called a **Payload Map** if you want to pass a subset of  `key=value` pairs to Splunk.
-In this mode, the Function uses a map where the `keys` are the keys that Splunk expects to see and the `values` in the map _are used 
-as **keys** to look up the value in the OCI event payload_ to pass to Splunk. If the Function finds a match _anywhere_ in the 
-event (included nested within the JSON), the event payload `value` will be assigned to the Splunk-expected `key` and 
+Here is an example of a transformed metric event using this logic:
+ 
+
+    {
+        "sourcetype": "_json", 
+        "event": {
+            "namespace": "oci_vcn",
+            "resourceGroup": null,
+            "compartmentId": "ocid1.compartment.oc1...",
+            "name": "VnicFromNetworkBytes",
+            "dimensions": {
+            "resourceId": "ocid1.vnic.oc1.phx..."
+            },
+            "metadata": {
+            "displayName": "Bytes from Network",
+            "unit": "bytes"
+            },
+            "datapoints": [
+            {
+                "timestamp": 1652196912000,
+                "value": 5780.0,
+                "count": 1
+            }
+            ]
+        }
+    }
+
+
+## Payload Maps
+
+There also is an **optional** feature called a **Payload Map**.  Use it if you need to pass a subset of `key=value` pairs to Splunk.
+
+In this mode, the Function uses a JSON map where the `l-values` are the keys that Splunk expects to see and the `r-values` in the map _are used 
+as **keys** to look up **values** in the OCI event payload_. If the Function finds a match _anywhere_ in the 
+event (included nested within the JSON), the event `value` will be assigned to the Splunk-expected `key` and 
 included it in the transformed output.
 
-Here is the default the payload map:
+Here is the default payload JSON:
 
      {
          "fields": {
@@ -187,7 +219,7 @@ Here is the default the payload map:
          }
      }
 
-Here is the resulting output of a Log Event using the default payload map:
+Here is the resulting output of a Log Event using the default payload JSON:
 
     {
         "fields": {
@@ -202,7 +234,7 @@ Here is the resulting output of a Log Event using the default payload map:
     }
 
 
-Here is the resulting output of a Raw Metric Event using the default payload map:
+Here is the resulting output of a Raw Metric Event using the default payload JSON:
 
     {
         "fields": {
@@ -215,12 +247,13 @@ Here is the resulting output of a Raw Metric Event using the default payload map
         }
     }
 
-### Customizing the Payload Map
+## Customizing the Payload Map 
 
-You can customize the selection by creating a JSON and setting it as a configuration parameter (see Function Configuration below).
+You can customize the selection by creating your own JSON and setting it as a configuration parameter 
+(see Function Configuration below).
 
-Note that the `keys` and `values` in the default payload map above are identical.  That causes the OCI key and value pair to be passed 
-to Splunk if present.  If you need to pass a different key for Splunk, just change the `l-value` like so:
+Note that the `l-values` and `r-values` in the default payload JSON above are identical.  That causes the OCI `key=value` 
+pairs to be passed as-is.  If you need to pass a different key for Splunk, just change the `l-value` like so:
 
      {
          "fields": {
@@ -232,8 +265,7 @@ to Splunk if present.  If you need to pass a different key for Splunk, just chan
          }
      }
 
-Finally, the `fields` object is not required.  Use 
-the [Splunk HEC examples](https://docs.splunk.com/Documentation/Splunk/latest/Data/HECExamples) as a guide.
+Refer to the [Splunk HEC examples](https://docs.splunk.com/Documentation/Splunk/latest/Data/HECExamples) page as a guide.
 
 
 ---
