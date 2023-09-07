@@ -86,8 +86,12 @@ def handler(ctx, data: io.BytesIO = None):
         converted_event_list = handle_events(event_list=event_list)
         send_to_endpoint(event_list=converted_event_list)
 
+    # if an exception occurs, log and raise again
+    # to signal Service Connector to retry payload
+
     except (Exception, ValueError) as ex:
         logging.getLogger().error('error handling logging payload: {}'.format(str(ex)))
+        raise ex
 
 
 def handle_events(event_list):
